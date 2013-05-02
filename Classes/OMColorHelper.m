@@ -51,6 +51,7 @@
 								 [[NSColor clearColor] colorUsingColorSpace:[NSColorSpace genericRGBColorSpace]], @"clear", nil];
 		
 		_rgbaUIColorRegex = [[NSRegularExpression regularExpressionWithPattern:@"(\\[\\s*UIColor\\s+colorWith|\\[\\s*\\[\\s*UIColor\\s+alloc\\]\\s*initWith)Red:\\s*([0-9]*\\.?[0-9]*f?)\\s*(\\/\\s*[0-9]*\\.?[0-9]*f?)?\\s+green:\\s*([0-9]*\\.?[0-9]*f?)\\s*(\\/\\s*[0-9]*\\.?[0-9]*f?)?\\s+blue:\\s*([0-9]*\\.?[0-9]*f?)\\s*(\\/\\s*[0-9]*\\.?[0-9]*f?)?\\s*alpha:\\s*([0-9]*\\.?[0-9]*f?)\\s*(\\/\\s*[0-9]*\\.?[0-9]*f?)?\\s*\\]" options:0 error:NULL] retain];
+        _macroRegex = [[NSRegularExpression regularExpressionWithPattern: @"RGBCOLOR\\((\\d+\\.?\\d+)\\s*,\\s*(\\d+\\.?\\d+)\\s*,\\s*(\\d+\\.?\\d+)\\)" options: 0 error: NULL] retain];
 		_whiteUIColorRegex = [[NSRegularExpression regularExpressionWithPattern:@"(\\[\\s*UIColor\\s+colorWith|\\[\\s*\\[\\s*UIColor\\s+alloc\\]\\s*initWith)White:\\s*([0-9]*\\.?[0-9]*f?)\\s*(\\/\\s*[0-9]*\\.?[0-9]*f?)?\\s+alpha:\\s*([0-9]*\\.?[0-9]*f?)\\s*(\\/\\s*[0-9]*\\.?[0-9]*f?)?\\s*\\]" options:0 error:NULL] retain];
 		_rgbaNSColorRegex = [[NSRegularExpression regularExpressionWithPattern:@"\\[\\s*NSColor\\s+colorWith(Calibrated|Device)Red:\\s*([0-9]*\\.?[0-9]*f?)\\s*(\\/\\s*[0-9]*\\.?[0-9]*f?)?\\s+green:\\s*([0-9]*\\.?[0-9]*f?)\\s*(\\/\\s*[0-9]*\\.?[0-9]*f?)?\\s+blue:\\s*([0-9]*\\.?[0-9]*f?)\\s*(\\/\\s*[0-9]*\\.?[0-9]*f?)?\\s+alpha:\\s*([0-9]*\\.?[0-9]*f?)\\s*(\\/\\s*[0-9]*\\.?[0-9]*f?)?\\s*\\]" options:0 error:NULL] retain];
 		_whiteNSColorRegex = [[NSRegularExpression regularExpressionWithPattern:@"\\[\\s*NSColor\\s+colorWith(Calibrated|Device)White:\\s*([0-9]*\\.?[0-9]*f?)\\s*(\\/\\s*[0-9]*\\.?[0-9]*f?)?\\s+alpha:\\s*([0-9]*\\.?[0-9]*f?)\\s*(\\/\\s*[0-9]*\\.?[0-9]*f?)?\\s*\\]" options:0 error:NULL] retain];
@@ -326,6 +327,21 @@
 			*stop = YES;
 		}
 	}];
+    
+    if (!foundColor) {
+        [_macroRegex enumerateMatchesInString: text options: 0 range:NSMakeRange(0, text.length)
+                                   usingBlock:^(NSTextCheckingResult *result, NSMatchingFlags flags, BOOL *stop) {
+                                       double red = [[text substringWithRange: [result rangeAtIndex: 1]] doubleValue];
+                                       double green = [[text substringWithRange: [result rangeAtIndex: 2]] doubleValue];
+                                       double blue = [[text substringWithRange: [result rangeAtIndex: 3]] doubleValue];
+                                       
+                                       foundColorType = OMColorTypeMacro1;
+                                       
+                                       foundColorRange = [result range];
+                                       foundColor = [NSColor colorWithCalibratedRed: red/255. green: green/255. blue: blue/255. alpha: 1.0];
+                                       *stop = YES;
+                                   }];
+    }
 	
 	if (!foundColor) {
 		[_whiteUIColorRegex enumerateMatchesInString:text options:0 range:NSMakeRange(0, text.length) usingBlock:^(NSTextCheckingResult *result, NSMatchingFlags flags, BOOL *stop) {
@@ -485,7 +501,9 @@
 					colorString = [NSString stringWithFormat:@"[UIColor colorWithRed:%.3f green:%.3f blue:%.3f alpha:%.3f]", red, green, blue, alpha];
 				} else if (colorType == OMColorTypeUIRGBAInit || colorType == OMColorTypeUIWhiteInit) {
 					colorString = [NSString stringWithFormat:@"[[UIColor alloc] initWithRed:%.3f green:%.3f blue:%.3f alpha:%.3f]", red, green, blue, alpha];
-				}
+				} else if (colorType == OMColorTypeMacro1) {
+                    colorString = [NSString stringWithFormat: @"RGBCOLOR(%.3f, %.3f, %.3f)", red*255., green*255., blue*255.];
+                }
 				else if (colorType == OMColorTypeNSConstant || colorType == OMColorTypeNSRGBACalibrated || colorType == OMColorTypeNSWhiteCalibrated) {
 					colorString = [NSString stringWithFormat:@"[NSColor colorWithCalibratedRed:%.3f green:%.3f blue:%.3f alpha:%.3f]", red, green, blue, alpha];
 				} else if (colorType == OMColorTypeNSRGBADevice || colorType == OMColorTypeNSWhiteDevice) {
@@ -507,6 +525,7 @@
 	[_textView release];
 	[_constantColorsByName release];
 	[_rgbaUIColorRegex release];
+    [_macroRegex release];
 	[_whiteUIColorRegex release];
 	[_constantColorsByName release];
 	[_whiteNSColorRegex release];
